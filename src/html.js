@@ -147,6 +147,12 @@ function feedCard(feed, baseUrl) {
         ${feedFields(feed)}
         <div class="actions"><button type="submit">Save</button></div>
       </form>
+      <form method="post" action="/feeds/${feed.id}/token"
+            onsubmit="return confirm('Change the secret URL? The current URL stops working.')">
+        <label>Set secret URL (paste an existing PodProxy feed URL or its token, e.g. to keep a URL after moving servers)</label>
+        <input type="text" name="token" required maxlength="2000" autocomplete="off" placeholder="https://…/f/0123456789abcdef0123456789abcdef.xml">
+        <div class="actions"><button class="secondary small" type="submit">Set secret URL</button></div>
+      </form>
       <form method="post" action="/feeds/${feed.id}/regenerate"
             onsubmit="return confirm('Generate a new secret URL? The old URL stops working and you must re-add the feed in your app.')">
         <div class="actions"><button class="secondary small" type="submit">Regenerate secret URL</button></div>
@@ -172,6 +178,8 @@ function dashboardPage({ feeds, baseUrl, flash }) {
     <h2>Add a feed</h2>
     <form method="post" action="/feeds">
       ${feedFields()}
+      <label>Secret URL (optional — paste an existing PodProxy feed URL or its token to keep using it; leave empty to generate a new one)</label>
+      <input type="text" name="token" maxlength="2000" autocomplete="off" placeholder="https://…/f/0123456789abcdef0123456789abcdef.xml">
       <div class="actions"><button type="submit">Create proxied feed</button></div>
     </form>
     <p class="hint">Each feed gets a secret URL. Anyone with the URL can read the feed, so treat it like a password — regenerate it if it leaks.</p>

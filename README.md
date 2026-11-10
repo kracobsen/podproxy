@@ -53,5 +53,6 @@ docker run -p 3000:3000 -e ADMIN_PASSWORD=changeme -v podproxy-data:/data podpro
 4. Repeat with the same upstream URL and a different title for each extra copy.
 
 Notes:
+- To keep an existing secret URL (e.g. after moving to a new server on the same domain), paste the old feed URL or its 32-character token into "Secret URL" when adding the feed, or use "Set secret URL" under Edit on an existing feed. Only tokens in the generated format are accepted.
 - Anyone with a feed's secret URL can read it — treat it like a password. Use "Regenerate secret URL" if one leaks (you'll need to re-add the feed in your app).
 - Forms rely on `SameSite=Lax` cookies for CSRF protection; use a modern browser and serve over HTTPS (Coolify does this by default).

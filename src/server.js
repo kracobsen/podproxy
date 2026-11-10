@@ -58,11 +58,28 @@ function validateFeedInput(body) {
   return { name, upstreamUrl, customTitle, customImageUrl };
 }
 
+const TOKEN_RE = /^[0-9a-f]{32}$/;
+
+// Lets an existing secret URL be carried over (e.g. when moving servers).
+// Accepts a full feed URL (".../f/<token>.xml") or the bare token. Only the
+// generated format is accepted, so a hand-picked URL can't be a guessable one.
+// Returns { token: null } for empty input.
+function parseTokenInput(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return { token: null };
+  const lastSegment = value.split(/[?#]/)[0].replace(/\/+$/, '').split('/').pop();
+  const token = lastSegment.replace(/\.xml$/i, '').toLowerCase();
+  if (!TOKEN_RE.test(token)) {
+    return { error: 'Secret URL must be a PodProxy feed URL or its 32-character hex token.' };
+  }
+  return { token };
+}
+
 // ---- Feed proxy (public, protected by the unguessable token) ----
 
 app.get('/f/:token', async (req, res) => {
   const token = req.params.token.replace(/\.xml$/i, '');
-  if (!/^[0-9a-f]{32}$/.test(token)) return res.status(404).send('Not found');
+  if (!TOKEN_RE.test(token)) return res.status(404).send('Not found');
   const feed = db.getFeedByToken(token);
   if (!feed) return res.status(404).send('Not found');
   try {
@@ -112,8 +129,16 @@ app.post('/logout', (req, res) => {
 app.post('/feeds', requireAdmin, (req, res) => {
   const input = validateFeedInput(req.body);
   if (input.error) return res.redirect(`/admin?err=${encodeURIComponent(input.error)}`);
-  db.createFeed(input);
-  res.redirect(`/admin?ok=${encodeURIComponent('Feed created — copy its URL into your podcast app.')}`);
+  const custom = parseTokenInput(req.body.token);
+  if (custom.error) return res.redirect(`/admin?err=${encodeURIComponent(custom.error)}`);
+  if (custom.token && db.getFeedByToken(custom.token)) {
+    return res.redirect(`/admin?err=${encodeURIComponent('That secret URL is already used by another feed.')}`);
+  }
+  db.createFeed({ ...input, token: custom.token });
+  const message = custom.token
+    ? 'Feed created with the secret URL you provided.'
+    : 'Feed created — copy its URL into your podcast app.';
+  res.redirect(`/admin?ok=${encodeURIComponent(message)}`);
 });
 
 app.post('/feeds/:id/update', requireAdmin, (req, res) => {
@@ -132,6 +157,24 @@ app.post('/feeds/:id/regenerate', requireAdmin, (req, res) => {
   invalidate(feed.token);
   db.regenerateToken(feed.id);
   res.redirect(`/admin?ok=${encodeURIComponent('New secret URL generated — update your podcast app.')}`);
+});
+
+app.post('/feeds/:id/token', requireAdmin, (req, res) => {
+  const feed = db.getFeedById(Number(req.params.id));
+  if (!feed) return res.redirect('/admin');
+  const { token, error } = parseTokenInput(req.body.token);
+  if (error || !token) {
+    return res.redirect(`/admin?err=${encodeURIComponent(error || 'Secret URL is required.')}`);
+  }
+  if (token === feed.token) {
+    return res.redirect(`/admin?ok=${encodeURIComponent('That is already this feed’s secret URL.')}`);
+  }
+  if (db.getFeedByToken(token)) {
+    return res.redirect(`/admin?err=${encodeURIComponent('That secret URL is already used by another feed.')}`);
+  }
+  invalidate(feed.token);
+  db.setToken(feed.id, token);
+  res.redirect(`/admin?ok=${encodeURIComponent('Secret URL set — the previous URL no longer works.')}`);
 });
 
 app.post('/feeds/:id/delete', requireAdmin, (req, res) => {

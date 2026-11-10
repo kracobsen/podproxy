@@ -34,8 +34,9 @@ module.exports = {
   getFeedByToken(token) {
     return db.prepare('SELECT * FROM feeds WHERE token = ?').get(token);
   },
-  createFeed({ name, upstreamUrl, customTitle, customImageUrl }) {
-    const token = newToken();
+  // `token` is optional: pass one to keep an existing secret URL.
+  createFeed({ name, upstreamUrl, customTitle, customImageUrl, token }) {
+    token = token || newToken();
     db.prepare(
       'INSERT INTO feeds (token, name, upstream_url, custom_title, custom_image_url) VALUES (?, ?, ?, ?, ?)'
     ).run(token, name, upstreamUrl, customTitle || null, customImageUrl || null);
@@ -50,6 +51,9 @@ module.exports = {
     const token = newToken();
     db.prepare('UPDATE feeds SET token = ? WHERE id = ?').run(token, id);
     return token;
+  },
+  setToken(id, token) {
+    db.prepare('UPDATE feeds SET token = ? WHERE id = ?').run(token, id);
   },
   deleteFeed(id) {
     db.prepare('DELETE FROM feeds WHERE id = ?').run(id);
